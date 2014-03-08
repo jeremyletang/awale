@@ -68,6 +68,58 @@ copy(List1, List2) :-
 inner_copy([],[]).
 inner_copy([Head|Next1],[Head|Next2]) :- inner_copy(Next1,Next2).
 
+% Game state
+
+reset_game :-
+    set_state(human, [4,4,4,4,4,4]),
+    set_state(ia, [4,4,4,4,4,4]),
+    set_score(human, 0),
+    set_score(ia, 0),
+    retract(current_player(_)),
+    assert(current_player(human)).
+
+win_by_seeds_quantity(Player, 0) :-
+    write(Player),
+    ansi_format([fg(green)], ' a gagne car il ne lui reste plus aucune graine \
+!\n', []),
+    reset_game.
+
+win_by_seeds_quantity(_, _) :- true.
+
+win_by_score(Player, Score) :-
+    Score @>= 25 ->
+    write(Player),
+    ansi_format([fg(green)], ' a gagne car il possede un score de 25 et plus \
+!\n', []),
+    reset_game
+    ; true.
+
+finalize_win_by_low_seeds(Player) :-
+    write(Player),
+    ansi_format([fg(green)], ' a gagne car il reste moins de 6 graines en \
+jeux, et c\'est lui qui possede le plus au score.', []),
+    reset_game.
+
+win_by_low_seeds :-
+    score(humam, HScore),
+    score(ia, IScore),
+    TotalScore is IScore + HScore,
+    TotalScore @>= 42 ->
+    (
+     HScore @> IScore ->
+     finalize_win_by_low_seeds(human)
+     ; IScore @> HScore ->
+     finalize_win_by_low_seeds(ia)
+     ; true
+    )
+    ; true.
+
+check_end_game(Player) :-
+    state(Player, State),
+    sum_list(State, Res),
+    win_by_seeds_quantity(Player, Res),
+    win_by_low_seeds.
+
 % Player play
 
 test_slot_empty(Slot) :-
@@ -169,9 +221,9 @@ dispatch_human(HumanState,
                       Seeds,
                       Player,
                       AddScore)
-        )
-        ; NewIaState = IaState,
-        NewHumanState = HumanState.
+    )
+    ; NewIaState = IaState,
+    NewHumanState = HumanState.
 
 apply_change_human(Slot) :-
     test_slot_empty(Slot),
@@ -192,6 +244,7 @@ apply_change_human(Slot) :-
                    AddScore),
     update_game_datas(NewHumanState, NewIaState, AddScore, 0),
     set_player,
+    check_end_game(human),
     draw_game.
 
 jouer(Position) :-
@@ -204,14 +257,17 @@ jouer(Position) :-
     Slot is Position - 1,
     apply_change_human(Slot)
     ; ansi_format([fg(red)], 'C\'est au tour de l\'IA de jouer maintenant !',
-          []).
+                  []).
 
 % IA play
+
+find_slot_ia(Slot) :-
+    write('ok').
 
 jouer_ia:-
     current_player(Player),
     Player == ia ->
-    writeln('ia play'),
+    find_slot_ia(0),
     set_player,
     draw_game
     ; ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
@@ -255,6 +311,18 @@ draw_game :-
     write('------------------------------------------------            \
 ---------------\n\n').
 
+notice :-
+    write('Commandes: \n\tPour choisire une case utilisez la procedure '),
+    ansi_format([fg(cyan)], 'jouer(X)', []),
+    write(' ou X est la case que vous avez choisi.\n\tPour faire jouer l\'IA\
+utilisez la procedure '),
+    ansi_format([fg(cyan)], 'jouer_ia', []),
+    write('.\n\tPour afficher cette notice utilisez la procedure '),
+    ansi_format([fg(cyan)], 'notice', []),
+    writeln('.').
+
 % Draw the game
 
+:- ansi_format([fg(green)], '\nBienvenue dans le jeu de l\'awale !\n\n', []).
+:- notice.
 :- draw_game.
