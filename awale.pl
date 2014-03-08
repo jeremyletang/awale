@@ -5,9 +5,14 @@
 :- dynamic(current_player/1).
 state(human, [4,4,4,4,4,4]).
 state(ia, [4,4,4,4,4,4]).
+:- assert(state(save_human, [4,4,4,4,4,4])).
+:- assert(state(save_ia, [4,4,4,4,4,4])).
 score(human, 0).
 score(ia, 0).
+:- assert(score(save_human, 0)).
+:- assert(score(save_ia, 0)).
 current_player(human).
+
 
 % States / Score utils
 
@@ -24,6 +29,12 @@ copy_state(Player, A) :-
     get(T, 4, V5),
     get(T, 5, V6),
     A = [V1, V2, V3, V4, V5, V6].
+
+update_states_from_saves:-
+    copy_state(save_ia, NewIa),
+    copy_state(save_human, NewHuman),
+    set_state(human, NewHuman),
+    set_state(ia, NewIa).
 
 set_score(Player, NewScore) :-
     retract(score(Player, _)),
@@ -67,16 +78,15 @@ dispatch_ia(Slot, Seeds, Player) :-
     Seeds > 0 ->
     (
      Slot @>= 0 ->
-     copy_state(ia, State),
+     copy_state(save_ia, State),
      get(State, Slot, SlotSeeds),
      NewSlotSeeds is SlotSeeds + 1,
      set(State, Slot, NewSlotSeeds, NewState),
-     set_state(ia, NewState),
+     set_state(save_ia, NewState),
      NewSeeds is Seeds - 1,
      NewSlot is Slot - 1,
      dispatch_ia(NewSlot, NewSeeds, Player)
-     ; NewSeeds is Seeds - 1,
-     dispatch_player(0, NewSeeds, Player)
+     ; dispatch_player(0, Seeds, Player)
     )
     ; true.
 
@@ -85,16 +95,15 @@ dispatch_player(Slot, Seeds, Player) :-
     Seeds > 0 ->
     (
      Slot @=< 5 ->
-     copy_state(human, State),
+     copy_state(save_human, State),
      get(State, Slot, SlotSeeds),
      NewSlotSeeds is SlotSeeds + 1,
      set(State, Slot, NewSlotSeeds, NewState),
-     set_state(human, NewState),
+     set_state(save_human, NewState),
      NewSeeds is Seeds - 1,
      NewSlot is Slot + 1,
      dispatch_player(NewSlot, NewSeeds, Player)
-     ; NewSeeds is Seeds - 1,
-     dispatch_ia(5, NewSeeds, Player)
+     ; dispatch_ia(5, Seeds, Player)
     )
     ; true.
 
@@ -106,6 +115,7 @@ apply_change_player(Slot) :-
     set_state(human, B),
     NewSlot is Slot + 1,
     dispatch_player(NewSlot, Seeds, human),
+    update_states_from_saves,
     set_player,
     draw_game.
 
