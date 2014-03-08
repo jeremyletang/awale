@@ -3,7 +3,7 @@
 :- dynamic(state/2).
 :- dynamic(score/2).
 :- dynamic(current_player/1).
-state(human, [4,4,4,4,4,4]).
+state(human, [0,4,4,4,4,4]).
 state(ia, [4,4,4,4,4,4]).
 score(human, 0).
 score(ia, 0).
@@ -25,7 +25,7 @@ set_player:-
     retract(current_player(_)),
     assert(current_player(ia))
     ; retract(current_player(_)),
-    assert(current_plauer(human)).
+    assert(current_player(human)).
 
     % List utils
 
@@ -39,6 +39,19 @@ get(Lin, Index, Value) :-
 
     % Player play
 
+test_slot_empty(Slot) :-
+    state(human, State),
+    get(State, Slot, Value),
+    Value > 0 ->
+    true
+    ; ansi_format([fg(red)], 'Vous ne pouver jouer une case vide!', []),
+    fail.
+
+apply_change(Slot) :-
+    test_slot_empty(Slot),
+    set_player,
+    draw_game.
+
 jouer(Position) :-
     Position > 6 ->
     writeln('Impossible de selectionner une position superieur a la case 6')
@@ -46,10 +59,10 @@ jouer(Position) :-
     writeln('Impossible de selectionner une position inferieur a la case 1')
     ; current_player(Player),
     Player == human ->
-    writeln('human play'),
-    set_player,
-    draw_game
-    ; ansi_format([fg(red)], 'C\'est au tour de l\'IA de jouer maintenant !', []).
+    Slot is Position - 1,
+    apply_change(Slot)
+    ; ansi_format([fg(red)], 'C\'est au tour de l\'IA de jouer maintenant !',
+          []).
 
     % IA play
 
@@ -59,7 +72,8 @@ jouer_ia:-
     writeln('ia play'),
     set_player,
     draw_game
-    ;  ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !', []).
+    ;  ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
+           []).
 
     % Drawing
 
@@ -97,4 +111,4 @@ draw_game:-
 
 % Draw the game
 
-%:- draw_game.
+:- draw_game.
