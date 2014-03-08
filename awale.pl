@@ -29,10 +29,16 @@ copy_state(Player, A) :-
     get(T, 5, V6),
     A = [V1, V2, V3, V4, V5, V6].
 
-update_game_data(NewHumanState, NewIaState, Score) :-
+update_game_datas(NewHumanState, NewIaState, HumanScore, IaScore) :-
     set_state(human, NewHumanState),
-    set_state(ia, NewIaState).
-    %set_score().
+    set_state(ia, NewIaState),
+    score(human, TmpHumanScore),
+    NewHumanScore is TmpHumanScore + HumanScore,
+    score(ia, TmpIaScore),
+    NewIaScore is TmpIaScore + IaScore,
+    set_score(ia, NewIaScore),
+    set_score(human, NewHumanScore).
+
 
 set_score(Player, NewScore) :-
     retract(score(Player, _)),
@@ -69,23 +75,26 @@ test_slot_empty(Slot) :-
     get(State, Slot, Value),
     Value > 0 ->
     true
-    ; ansi_format([fg(red)], 'Vous ne pouver jouer une case vide!', []),
+    ; ansi_format([fg(red)], 'Vous ne pouvez jouer une case vide!', []),
     fail.
 
-win_slot(State, NewState, Slot, 5) :-
+win_slot(State, NewState, Slot, 2, AddScore) :-
     set(State, Slot, 0, TmpNewState),
-    NewState = TmpNewState.
+    NewState = TmpNewState,
+    AddScore = 2.
 
-win_slot(State, NewState, Slot, 6) :-
+win_slot(State, NewState, Slot, 3, AddScore) :-
     set(State, Slot, 0, TmpNewState),
-    NewState = TmpNewState.
+    NewState = TmpNewState,
+    AddScore = 3.
 
-win_slot(State, NewState, _, _) :-
-    NewState = State.
+win_slot(State, NewState, _, _, AddScore) :-
+    NewState = State,
+    AddScore = 0.
 
-check_previous_slot(State, NewState, Slot) :-
+check_previous_slot(State, NewState, Slot, AddScore) :-
     get(State, Slot, SlotSeeds),
-    win_slot(State, NewState, Slot, SlotSeeds).
+    win_slot(State, NewState, Slot, SlotSeeds, AddScore).
 
 dispatch_ia(HumanState,
             IaState,
@@ -93,7 +102,8 @@ dispatch_ia(HumanState,
             NewIaState,
             Slot,
             Seeds,
-            Player) :-
+            Player,
+            AddScore) :-
     Seeds > 0 ->
     (
         Slot @>= 0 ->
@@ -108,27 +118,25 @@ dispatch_ia(HumanState,
                     NewIaState,
                     NewSlot,
                     NewSeeds,
-                    Player)
+                    Player,
+                    AddScore)
         ; dispatch_player(HumanState,
                           IaState,
                           NewHumanState,
                           NewIaState,
                           0,
                           Seeds,
-                          Player)
+                          Player,
+                          AddScore)
     )
     ; NewHumanState = HumanState,
     current_player(Player),
     Player == human ->
     write('Human'),
     PrevSlot is Slot + 1,
-    check_previous_slot(IaState, TmpNewIaState, PrevSlot),
+    check_previous_slot(IaState, TmpNewIaState, PrevSlot, AddScore),
     NewIaState = TmpNewIaState
     ; NewIaState = IaState.
-
-
-
-test(A,B):- A is 3, B is 4.
 
 dispatch_player(HumanState,
                 IaState,
@@ -136,7 +144,8 @@ dispatch_player(HumanState,
                 NewIaState,
                 Slot,
                 Seeds,
-                Player) :-
+                Player,
+                AddScore) :-
     Seeds > 0 ->
     (
         Slot @=< 5 ->
@@ -151,14 +160,16 @@ dispatch_player(HumanState,
                         NewIaState,
                         NewSlot,
                         NewSeeds,
-                        Player)
+                        Player,
+                        AddScore)
         ; dispatch_ia(HumanState,
                       IaState,
                       NewHumanState,
                       NewIaState,
                       5,
                       Seeds,
-                      Player)
+                      Player,
+                      AddScore)
         )
         ; NewIaState = IaState,
         NewHumanState = HumanState.
@@ -178,8 +189,9 @@ apply_change_player(Slot) :-
             NewIaState,
             NewSlot,
             Seeds,
-            human),
-    update_game_data(NewHumanState, NewIaState, 42),
+            human,
+            AddScore),
+    update_game_datas(NewHumanState, NewIaState, AddScore, 0),
     set_player,
     draw_game.
 
@@ -230,13 +242,17 @@ draw_game :-
     write('|  IA      |  '),
     draw_values(StateIA, 0),
     write(ScoreIA),
-    write('      |\n'),
+    (ScoreIA < 10 ->
+     write('      |\n')
+     ; write('     |\n')),
     write('------------------------------------------------            \
 ---------------\n'),
     write('|  Humain  |  '),
     draw_values(StateHuman, 0),
     write(ScoreHuman),
-    write('      |\n'),
+    (ScoreHuman < 10 ->
+     write('      |\n')
+     ; write('     |\n')),
     write('------------------------------------------------            \
 ---------------\n\n').
 
