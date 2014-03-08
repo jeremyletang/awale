@@ -13,7 +13,6 @@ score(ia, 0).
 :- assert(score(save_ia, 0)).
 current_player(human).
 
-
 % States / Score utils
 
 set_state(Player, NewState) :-
@@ -30,17 +29,16 @@ copy_state(Player, A) :-
     get(T, 5, V6),
     A = [V1, V2, V3, V4, V5, V6].
 
-update_states_from_saves:-
-    copy_state(save_ia, NewIa),
-    copy_state(save_human, NewHuman),
-    set_state(human, NewHuman),
-    set_state(ia, NewIa).
+update_game_data(NewHumanState, NewIaState, Score) :-
+    set_state(human, NewHumanState),
+    set_state(ia, NewIaState).
+    %set_score().
 
 set_score(Player, NewScore) :-
     retract(score(Player, _)),
     assert(score(Player, NewScore)).
 
-set_player:-
+set_player :-
     current_player(Player),
     Player == human ->
     retract(current_player(_)),
@@ -74,38 +72,96 @@ test_slot_empty(Slot) :-
     ; ansi_format([fg(red)], 'Vous ne pouver jouer une case vide!', []),
     fail.
 
-dispatch_ia(Slot, Seeds, Player) :-
+win_slot(State, NewState, Slot, 5) :-
+    set(State, Slot, 0, TmpNewState),
+    NewState = TmpNewState.
+
+win_slot(State, NewState, Slot, 6) :-
+    set(State, Slot, 0, TmpNewState),
+    NewState = TmpNewState.
+
+win_slot(State, NewState, _, _) :-
+    NewState = State.
+
+check_previous_slot(State, NewState, Slot) :-
+    get(State, Slot, SlotSeeds),
+    win_slot(State, NewState, Slot, SlotSeeds).
+
+dispatch_ia(HumanState,
+            IaState,
+            NewHumanState,
+            NewIaState,
+            Slot,
+            Seeds,
+            Player) :-
     Seeds > 0 ->
     (
-     Slot @>= 0 ->
-     copy_state(save_ia, State),
-     get(State, Slot, SlotSeeds),
-     NewSlotSeeds is SlotSeeds + 1,
-     set(State, Slot, NewSlotSeeds, NewState),
-     set_state(save_ia, NewState),
-     NewSeeds is Seeds - 1,
-     NewSlot is Slot - 1,
-     dispatch_ia(NewSlot, NewSeeds, Player)
-     ; dispatch_player(0, Seeds, Player)
+        Slot @>= 0 ->
+        get(IaState, Slot, SlotSeeds),
+        NewSlotSeeds is SlotSeeds + 1,
+        set(IaState, Slot, NewSlotSeeds, NewState),
+        NewSeeds is Seeds - 1,
+        NewSlot is Slot - 1,
+        dispatch_ia(HumanState,
+                    NewState,
+                    NewHumanState,
+                    NewIaState,
+                    NewSlot,
+                    NewSeeds,
+                    Player)
+        ; dispatch_player(HumanState,
+                          IaState,
+                          NewHumanState,
+                          NewIaState,
+                          0,
+                          Seeds,
+                          Player)
     )
-    ; true.
+    ; NewHumanState = HumanState,
+    current_player(Player),
+    Player == human ->
+    write('Human'),
+    PrevSlot is Slot + 1,
+    check_previous_slot(IaState, TmpNewIaState, PrevSlot),
+    NewIaState = TmpNewIaState
+    ; NewIaState = IaState.
 
 
-dispatch_player(Slot, Seeds, Player) :-
+
+test(A,B):- A is 3, B is 4.
+
+dispatch_player(HumanState,
+                IaState,
+                NewHumanState,
+                NewIaState,
+                Slot,
+                Seeds,
+                Player) :-
     Seeds > 0 ->
     (
-     Slot @=< 5 ->
-     copy_state(save_human, State),
-     get(State, Slot, SlotSeeds),
-     NewSlotSeeds is SlotSeeds + 1,
-     set(State, Slot, NewSlotSeeds, NewState),
-     set_state(save_human, NewState),
-     NewSeeds is Seeds - 1,
-     NewSlot is Slot + 1,
-     dispatch_player(NewSlot, NewSeeds, Player)
-     ; dispatch_ia(5, Seeds, Player)
-    )
-    ; true.
+        Slot @=< 5 ->
+        get(HumanState, Slot, SlotSeeds),
+        NewSlotSeeds is SlotSeeds + 1,
+        set(HumanState, Slot, NewSlotSeeds, NewState),
+        NewSeeds is Seeds - 1,
+        NewSlot is Slot + 1,
+        dispatch_player(NewState,
+                        IaState,
+                        NewHumanState,
+                        NewIaState,
+                        NewSlot,
+                        NewSeeds,
+                        Player)
+        ; dispatch_ia(HumanState,
+                      IaState,
+                      NewHumanState,
+                      NewIaState,
+                      5,
+                      Seeds,
+                      Player)
+        )
+        ; NewIaState = IaState,
+        NewHumanState = HumanState.
 
 apply_change_player(Slot) :-
     test_slot_empty(Slot),
@@ -114,8 +170,16 @@ apply_change_player(Slot) :-
     set(A, Slot, 0, B),
     set_state(human, B),
     NewSlot is Slot + 1,
-    dispatch_player(NewSlot, Seeds, human),
-    update_states_from_saves,
+    copy_state(human, HumanState),
+    copy_state(ia, IaState),
+    dispatch_player(HumanState,
+            IaState,
+            NewHumanState,
+            NewIaState,
+            NewSlot,
+            Seeds,
+            human),
+    update_game_data(NewHumanState, NewIaState, 42),
     set_player,
     draw_game.
 
@@ -139,7 +203,7 @@ jouer_ia:-
     writeln('ia play'),
     set_player,
     draw_game
-    ;  ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
+    ; ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
            []).
 
 % Drawing
@@ -153,7 +217,7 @@ draw_values(List, X) :-
     draw_values(List, N)
     ; write('          |      ').
 
-draw_game:-
+draw_game :-
     state(human, StateHuman),
     state(ia, StateIA),
     score(human, ScoreHuman),
