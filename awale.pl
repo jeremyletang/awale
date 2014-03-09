@@ -11,7 +11,7 @@ score(human, 0).
 score(ia, 0).
 :- assert(score(save_human, 0)).
 :- assert(score(save_ia, 0)).
-current_player(human).
+current_player(ia).
 
 % States / Score utils
 
@@ -187,7 +187,9 @@ dispatch_ia(HumanState,
     PrevSlot is Slot + 1,
     check_previous_slot(IaState, TmpNewIaState, PrevSlot, AddScore),
     NewIaState = TmpNewIaState
-    ; NewIaState = IaState.
+    ; NewIaState = IaState,
+    NewHumanState = HumanState,
+    AddScore = 0.
 
 dispatch_human(HumanState,
                IaState,
@@ -223,7 +225,14 @@ dispatch_human(HumanState,
                       AddScore)
     )
     ; NewIaState = IaState,
-    NewHumanState = HumanState.
+    current_player(Player),
+    Player == ia ->
+    PrevSlot is Slot - 1,
+    check_previous_slot(HumanState, TmpNewHumanState, PrevSlot, AddScore),
+    NewHumanState = TmpNewHumanState
+    ; NewIaState = IaState,
+    NewHumanState = HumanState,
+    AddScore = 0.
 
 apply_change_human(Slot) :-
     test_slot_empty(Slot),
@@ -261,13 +270,60 @@ jouer(Position) :-
 
 % IA play
 
-find_slot_ia(Slot) :-
-    write('ok').
+check_better_states(HumanState, IaState, AddScore, CurrentScore, NewCurrentScore) :-
+    writeln('Check Better'),
+    writeln(IaState),
+    writeln(HumanState),
+    writeln(AddScore),
+    AddScore > CurrentScore ->
+    NewCurrentScore = AddScore,
+    set_state(save_human, HumanState),
+    set_state(save_ia, IaState)
+    ; NewCurrentScore = CurrentScore.
+
+%% update_game_datas(NewHumanState, NewIaState, HumanScore, IaScore) :-
+%%     set_state(human, NewHumanState),
+%%     set_state(ia, NewIaState),
+%%     score(human, TmpHumanScore),
+%%     NewHumanScore is TmpHumanScore + HumanScore,
+%%     score(ia, TmpIaScore),
+%%     NewIaScore is TmpIaScore + IaScore,
+%%     set_score(ia, NewIaScore),
+%%     set_score(human, NewHumanScore).
+
+
+find_slot_ia(Slot, CurrentScore) :-
+    Slot < 6 ->
+    copy_state(ia, A),
+    get(A, Slot, Seeds),
+    (
+        Seeds == 0 ->
+        NewSlot is Slot + 1,
+        find_slot_ia(NewSlot, CurrentScore)
+        ; copy_state(human, HumanState),
+        copy_state(ia, I),
+        set(I, Slot, 0, IaState),
+        SlotCopy is Slot - 1,
+        dispatch_ia(HumanState,
+                    IaState,
+                    NewHumanState,
+                    NewIaState,
+                    SlotCopy,
+                    Seeds,
+                    ia,
+                    AddScore),
+        check_better_states(NewHumanState, NewIaState, AddScore, CurrentScore, NewCurrentScore),
+        NewSlot is Slot + 1,
+        find_slot_ia(NewSlot, NewCurrentScore)
+    )
+    ; state(save_human, HumanState),
+    state(save_ia, IaState),
+    update_game_datas(HumanState, IaState,0, CurrentScore).
 
 jouer_ia:-
     current_player(Player),
     Player == ia ->
-    find_slot_ia(0),
+    find_slot_ia(0, -1),
     set_player,
     draw_game
     ; ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
@@ -279,7 +335,9 @@ draw_values(List, X) :-
     X < 6 ->
     get(List, X, Value),
     write(Value),
-    write('  |  '),
+    (Value < 10 ->
+    write('  |  ')
+    ; write(' |  ')),
     N is X + 1,
     draw_values(List, N)
     ; write('          |      ').
@@ -312,7 +370,7 @@ draw_game :-
 ---------------\n\n').
 
 notice :-
-    write('Commandes: \n\tPour choisire une case utilisez la procedure '),
+    write('Commandes: \n\tPour choisir une case utilisez la procedure '),
     ansi_format([fg(cyan)], 'jouer(X)', []),
     write(' ou X est la case que vous avez choisi.\n\tPour faire jouer l\'IA\
 utilisez la procedure '),
