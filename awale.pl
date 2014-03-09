@@ -118,6 +118,8 @@ check_end_game(Player) :-
     state(Player, State),
     sum_list(State, Res),
     win_by_seeds_quantity(Player, Res),
+    score(Player, Score),
+    win_by_score(Player, Score),
     win_by_low_seeds.
 
 % Player play
