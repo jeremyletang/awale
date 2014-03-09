@@ -11,7 +11,7 @@ score(human, 0).
 score(ia, 0).
 :- assert(score(save_human, 0)).
 :- assert(score(save_ia, 0)).
-current_player(ia).
+current_player(human).
 
 % States / Score utils
 
@@ -270,27 +270,16 @@ jouer(Position) :-
 
 % IA play
 
-check_better_states(HumanState, IaState, AddScore, CurrentScore, NewCurrentScore) :-
-    writeln('Check Better'),
-    writeln(IaState),
-    writeln(HumanState),
-    writeln(AddScore),
+check_better_states(HumanState, 
+                    IaState, 
+                    AddScore, 
+                    CurrentScore, 
+                    NewCurrentScore) :-
     AddScore > CurrentScore ->
     NewCurrentScore = AddScore,
     set_state(save_human, HumanState),
     set_state(save_ia, IaState)
     ; NewCurrentScore = CurrentScore.
-
-%% update_game_datas(NewHumanState, NewIaState, HumanScore, IaScore) :-
-%%     set_state(human, NewHumanState),
-%%     set_state(ia, NewIaState),
-%%     score(human, TmpHumanScore),
-%%     NewHumanScore is TmpHumanScore + HumanScore,
-%%     score(ia, TmpIaScore),
-%%     NewIaScore is TmpIaScore + IaScore,
-%%     set_score(ia, NewIaScore),
-%%     set_score(human, NewHumanScore).
-
 
 find_slot_ia(Slot, CurrentScore) :-
     Slot < 6 ->
@@ -312,7 +301,11 @@ find_slot_ia(Slot, CurrentScore) :-
                     Seeds,
                     ia,
                     AddScore),
-        check_better_states(NewHumanState, NewIaState, AddScore, CurrentScore, NewCurrentScore),
+        check_better_states(NewHumanState, 
+                            NewIaState, 
+                            AddScore, 
+                            CurrentScore, 
+                            NewCurrentScore),
         NewSlot is Slot + 1,
         find_slot_ia(NewSlot, NewCurrentScore)
     )
@@ -325,6 +318,7 @@ jouer_ia:-
     Player == ia ->
     find_slot_ia(0, -1),
     set_player,
+    check_end_game(ia),
     draw_game
     ; ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
            []).
