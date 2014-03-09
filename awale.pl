@@ -131,7 +131,7 @@ check_end_game(Player) :-
     win_by_score(Player, Score),
     win_by_low_seeds.
 
-%% Player play
+% Player play
 
 % Verifie en debut de partie si la case choisit par l'utilisateur est
 % vide, si oui alors un message d'erreur est emis et le joueur doit
