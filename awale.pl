@@ -15,10 +15,12 @@ current_player(human).
 
 % States / Score utils
 
+% Met a jour l'etat du plateau d'un des deux joueurs
 set_state(Player, NewState) :-
     retract(state(Player, _)),
     assert(state(Player, NewState)).
 
+% Realise une copie du plateau d'un des deux joueurs.
 copy_state(Player, A) :-
     state(Player, T),
     get(T, 0, V1),
@@ -29,6 +31,7 @@ copy_state(Player, A) :-
     get(T, 5, V6),
     A = [V1, V2, V3, V4, V5, V6].
 
+% Mise a jour de tous le plateau
 update_game_datas(NewHumanState, NewIaState, HumanScore, IaScore) :-
     set_state(human, NewHumanState),
     set_state(ia, NewIaState),
@@ -39,11 +42,12 @@ update_game_datas(NewHumanState, NewIaState, HumanScore, IaScore) :-
     set_score(ia, NewIaScore),
     set_score(human, NewHumanScore).
 
-
+% Met a jour le score d'un des joueurs.
 set_score(Player, NewScore) :-
     retract(score(Player, _)),
     assert(score(Player, NewScore)).
 
+% Specifier le joueur courant
 set_player :-
     current_player(Player),
     Player == human ->
@@ -70,6 +74,7 @@ inner_copy([Head|Next1],[Head|Next2]) :- inner_copy(Next1,Next2).
 
 % Game state
 
+% Reinitialise le jeu apres que la partie soit gagnee.
 reset_game :-
     set_state(human, [4,4,4,4,4,4]),
     set_state(ia, [4,4,4,4,4,4]),
@@ -78,6 +83,7 @@ reset_game :-
     retract(current_player(_)),
     assert(current_player(human)).
 
+% Verifie si le joueur a gagner la partie en ayant plus aucune graine de son cote.
 win_by_seeds_quantity(Player, 0) :-
     write(Player),
     ansi_format([fg(green)], ' a gagne car il ne lui reste plus aucune graine \
@@ -86,6 +92,8 @@ win_by_seeds_quantity(Player, 0) :-
 
 win_by_seeds_quantity(_, _) :- true.
 
+% Verifie si le joueur a gagne la partie en ayant un score totale de plus de
+% 25 graines
 win_by_score(Player, Score) :-
     Score @>= 25 ->
     write(Player),
@@ -100,6 +108,9 @@ finalize_win_by_low_seeds(Player) :-
 jeux, et c\'est lui qui possede le plus au score.', []),
     reset_game.
 
+% Verifie si le nombre de graine encore disponibles sur le plateau est
+% inferieur a 6, dans ce cas la partie ce termine. On verifie alors
+% quel joueur a le plus de graine afin de determiner le vainqueur.
 win_by_low_seeds :-
     score(humam, HScore),
     score(ia, IScore),
@@ -108,10 +119,10 @@ win_by_low_seeds :-
     (
      HScore @> IScore ->
      finalize_win_by_low_seeds(human)
-     ; finalize_win_by_low_seeds(ia)
     )
     ; true.
 
+% Verifie si la partie est terminee.
 check_end_game(Player) :-
     state(Player, State),
     sum_list(State, Res),
@@ -122,6 +133,9 @@ check_end_game(Player) :-
 
 % Player play
 
+% Verifie en debut de partie si la case choisit par l'utilisateur est
+% vide, si oui alors un message d'erreur est emis et le joueur doit
+% choisir une nouvelle case. Si non le dispatch des graines est lance.
 test_slot_empty(Slot) :-
     state(human, State),
     get(State, Slot, Value),
@@ -130,24 +144,38 @@ test_slot_empty(Slot) :-
     ; ansi_format([fg(red)], 'Vous ne pouvez jouer une case vide!', []),
     fail.
 
+% La case final apres le dispatch des graine du joueur possede 2 graine,
+% le joueur gagne donc ces 2 graines.
 win_slot(State, NewState, Slot, 2, AddScore) :-
     set(State, Slot, 0, TmpNewState),
     NewState = TmpNewState,
     AddScore = 2.
 
+% La case final apres le dispatch des graine du joueur possede 3 graine,
+% le joueur gagne donc ces 3 graines.
 win_slot(State, NewState, Slot, 3, AddScore) :-
     set(State, Slot, 0, TmpNewState),
     NewState = TmpNewState,
     AddScore = 3.
 
+% Tous les autres cas de fin de dispatch des graine, rien a gagner.
 win_slot(State, NewState, _, _, AddScore) :-
     NewState = State,
     AddScore = 0.
 
+% Verification du Slot precedant afin de avoir si le joueur gagne
+% des graines ou non.
 check_previous_slot(State, NewState, Slot, AddScore) :-
     get(State, Slot, SlotSeeds),
     win_slot(State, NewState, Slot, SlotSeeds, AddScore).
 
+% Insertion des graines dans les cases du cotes ia.
+% Tant que le nombre de graines est superieur a 0 ajoute une graine
+% dans la case courant puis se rappel, ou appel la procedure
+% dispatch_ia si on est arrive au bout des case du joueur. Si le
+% nombre de graine est egale a 0 on verifie alors si le joueur courant
+% est l'humain, et si la case courante possede une ou deux graine. Puis les
+% donnes du plateau dans son etat final ainsi que le score sont unifie.
 dispatch_ia(HumanState,
             IaState,
             NewHumanState,
@@ -191,6 +219,13 @@ dispatch_ia(HumanState,
     NewHumanState = HumanState,
     AddScore = 0.
 
+% Insertion des graines dans les cases du cotes humain.
+% Tant que le nombre de graines est superieur a 0 ajoute une graine
+% dans la case courant puis se rappel, ou appel la procedure
+% dispatch_ia si on est arrive au bout des case du joueur. Si le
+% nombre de graine est egale a 0 on verifie alors si le joueur courant
+% est l'IA, et si la case courante possede une ou deux graine. Puis les
+% donnes du plateau dans son etat final ainsi que le score sont unifie.
 dispatch_human(HumanState,
                IaState,
                NewHumanState,
@@ -234,6 +269,9 @@ dispatch_human(HumanState,
     NewHumanState = HumanState,
     AddScore = 0.
 
+% Lance le dispatch des graines dans les differentes cases, puis mets
+% a jours les differentes donnees de jeux et verifie si la partie est
+% terminee
 apply_change_human(Slot) :-
     test_slot_empty(Slot),
     copy_state(human, A),
@@ -256,6 +294,13 @@ apply_change_human(Slot) :-
     check_end_game(human),
     draw_game.
 
+% Procedure de jeu du joueur humain.
+% Position -> La case que le joueur selectionne.
+% Verifie si la case selectionne est inferieur a 1 ou superieur a 6 ( cases
+% en dehors du plateau), si oui affiche un message d'erreur, si non verifie
+% alors si le tour de jeu est celui du joueur humain, si oui alors le
+% dispatch des graines dans les differentes cases est lance. Sinon un
+% message d'erreur est affiche.
 jouer(Position) :-
     Position > 6 ->
     writeln('Impossible de selectionner une position superieur a la case 6')
@@ -270,10 +315,13 @@ jouer(Position) :-
 
 % IA play
 
-check_better_states(HumanState, 
-                    IaState, 
-                    AddScore, 
-                    CurrentScore, 
+% Verifie si le nouvel etats du plateau, ainsi que le nouveau score sont
+% meilleurs que l'ancien. Si oui le nouveau score courant est unifier avec
+% le nouveau score.
+check_better_states(HumanState,
+                    IaState,
+                    AddScore,
+                    CurrentScore,
                     NewCurrentScore) :-
     AddScore > CurrentScore ->
     NewCurrentScore = AddScore,
@@ -281,6 +329,19 @@ check_better_states(HumanState,
     set_state(save_ia, IaState)
     ; NewCurrentScore = CurrentScore.
 
+% Procedure principal de l'IA
+%
+% Permet de passer sur les differentes case du plateau appartenant a l'IA,
+% verifie d'abord si la case est vide, si oui, la procedure est rappelee
+% avec en parametre la case suivante et le score courant. Sinon le dispatch
+% des graines est effectues dans les differentes case puis l'etat des cases
+% et le nouveau score ainsi obtenu est unifie afin de determine si le
+% nouveau score est meilleur que l'ancien score (appel de check_better_states)
+% enfin la procedure se rappel afin de verifier les autres cases.
+%
+% Lorsque toutes les cases sont verifiees le nouvel etat du plateau est
+% enregistre ainsi que le nouveau score, puis on verifie si la partie est
+% terminee.
 find_slot_ia(Slot, CurrentScore) :-
     Slot < 6 ->
     copy_state(ia, A),
@@ -301,10 +362,10 @@ find_slot_ia(Slot, CurrentScore) :-
                     Seeds,
                     ia,
                     AddScore),
-        check_better_states(NewHumanState, 
-                            NewIaState, 
-                            AddScore, 
-                            CurrentScore, 
+        check_better_states(NewHumanState,
+                            NewIaState,
+                            AddScore,
+                            CurrentScore,
                             NewCurrentScore),
         NewSlot is Slot + 1,
         find_slot_ia(NewSlot, NewCurrentScore)
@@ -313,6 +374,7 @@ find_slot_ia(Slot, CurrentScore) :-
     state(save_ia, IaState),
     update_game_datas(HumanState, IaState,0, CurrentScore).
 
+% Lancement du tour de jeu de l'IA
 jouer_ia:-
     current_player(Player),
     Player == ia ->
@@ -336,6 +398,7 @@ draw_values(List, X) :-
     draw_values(List, N)
     ; write('          |      ').
 
+% Dessiner le plateau de jeu et les scores
 draw_game :-
     state(human, StateHuman),
     state(ia, StateIA),
@@ -363,6 +426,7 @@ draw_game :-
     write('------------------------------------------------            \
 ---------------\n\n').
 
+% Afficher la documentation du jeu
 notice :-
     write('Commandes: \n\tPour choisir une case utilisez la procedure '),
     ansi_format([fg(cyan)], 'jouer(X)', []),
