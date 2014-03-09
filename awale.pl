@@ -108,9 +108,7 @@ win_by_low_seeds :-
     (
      HScore @> IScore ->
      finalize_win_by_low_seeds(human)
-     ; IScore @> HScore ->
-     finalize_win_by_low_seeds(ia)
-     ; true
+     ; finalize_win_by_low_seeds(ia)
     )
     ; true.
 
