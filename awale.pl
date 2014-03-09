@@ -81,7 +81,8 @@ reset_game :-
     set_score(human, 0),
     set_score(ia, 0),
     retract(current_player(_)),
-    assert(current_player(human)).
+    assert(current_player(human)),
+    draw_game.
 
 % Verifie si le joueur a gagner la partie en ayant plus aucune graine de son cote.
 win_by_seeds_quantity(Player, 0) :-
@@ -292,8 +293,8 @@ apply_change_human(Slot) :-
                    AddScore),
     update_game_datas(NewHumanState, NewIaState, AddScore, 0),
     set_player,
-    check_end_game(human),
-    draw_game.
+    draw_game,
+    check_end_game(human).
 
 % Procedure de jeu du joueur humain.
 % Position -> La case que le joueur selectionne.
@@ -317,7 +318,7 @@ jouer(Position) :-
 % IA play
 
 % Verifie si le nouvel etats du plateau, ainsi que le nouveau score sont
-% meilleurs que l'ancien. Si oui le nouveau score courant est unifier avec
+% meilleurs que l ancien. Si oui le nouveau score courant est unifier avec
 % le nouveau score.
 check_better_states(HumanState,
                     IaState,
@@ -329,6 +330,20 @@ check_better_states(HumanState,
     set_state(save_human, HumanState),
     set_state(save_ia, IaState)
     ; NewCurrentScore = CurrentScore.
+
+most_seeds_slot(Slot, CurrentSlot, CurrentSeeds, ReturnSlot) :-
+    Slot @< 6 ->
+    copy_state(ia, I),
+    get(I, Slot, SlotSeeds),
+    NewSlot is Slot + 1,
+    (
+        SlotSeeds > CurrentSeeds ->
+        most_seeds_slot(NewSlot, Slot, SlotSeeds, ReturnSlot)
+        ; most_seeds_slot(NewSlot, CurrentSlot, CurrentSeeds, ReturnSlot)
+    )
+    ; CurrentSlot = CurrentSlot,
+    CurrentSeeds = CurrentSeeds,
+    ReturnSlot = CurrentSlot.
 
 % Procedure principal de l'IA
 %
@@ -373,7 +388,24 @@ find_slot_ia(Slot, CurrentScore) :-
     )
     ; state(save_human, HumanState),
     state(save_ia, IaState),
-    update_game_datas(HumanState, IaState,0, CurrentScore).
+    CurrentScore > 0 ->
+    update_game_datas(HumanState, IaState,0, CurrentScore)
+    ; copy_state(human, HumanState),
+    copy_state(ia, I),
+    most_seeds_slot(0, 0, 0, ReturnSlot),
+    set(I, ReturnSlot, 0, IaState),
+    get(I, ReturnSlot, Seeds),
+    NextSlot is ReturnSlot - 1,
+    dispatch_ia(HumanState,
+                IaState,
+                NewHumanState,
+                NewIaState,
+                NextSlot,
+                Seeds,
+                ia,
+                AddScore),
+    update_game_datas(NewHumanState, NewIaState,0, AddScore).
+
 
 % Lancement du tour de jeu de l'IA
 jouer_ia:-
@@ -381,8 +413,8 @@ jouer_ia:-
     Player == ia ->
     find_slot_ia(0, -1),
     set_player,
-    check_end_game(ia),
-    draw_game
+    draw_game,
+    check_end_game(ia)
     ; ansi_format([fg(red)], 'C\'est au tour du joueur de jouer maintenant !',
            []).
 
